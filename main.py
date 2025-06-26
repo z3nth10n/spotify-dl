@@ -6,28 +6,19 @@ from yt_dlp import YoutubeDL
 
 from tqdm import tqdm
 
+import time
+import stem
+import stem.control
+
+def renew_tor_ip():
+    with stem.control.Controller.from_port(port=9051) as controller:
+        controller.authenticate()
+        controller.signal(stem.Signal.NEWNYM)
+
 # --- Configuración de carpetas ---
 EXPORT_DIR = "exportify"
 EXPORT_RESULT_DIR = "exports"
 os.makedirs(EXPORT_RESULT_DIR, exist_ok=True)
-
-# # --- Listar archivos disponibles ---
-# csv_files = [f for f in os.listdir(EXPORT_DIR) if f.endswith('.csv')]
-# if not csv_files:
-#     print("❌ No se encontraron archivos .csv en la carpeta 'spotify/'.")
-#     exit()
-
-# print("Archivos disponibles:")
-
-# for i, file in enumerate(csv_files):
-#     print(f"{i + 1}. {file}")
-
-# choice = input("Selecciona el número del archivo que deseas procesar: ")
-# try:
-#     selected_file = csv_files[int(choice) - 1]
-# except (ValueError, IndexError):
-#     print("❌ Selección inválida.")
-#     exit()
 
 # --- yt_dlp settings ---
 ydl_opts = {
@@ -70,7 +61,7 @@ def choose_best_video(results, expected_duration=None):
 
     return best or results[0]  # si nada cumple, se queda con algo
 
-def process_file_sequential(file_or_df, name_override=None):
+def process_file_sequential(file_or_df, name_override=None, max_retries=3):
     df = pd.DataFrame()
     out_name = ""
     
@@ -114,30 +105,40 @@ def process_file_sequential(file_or_df, name_override=None):
             query = f"{artist} - {title}"
             duration = row['Expected Duration (s)']
 
-            try:
-                info = ydl.extract_info(query, download=False)
-                if 'entries' in info:
-                    video = choose_best_video(info['entries'], duration)
-                else:
-                    video = info
+            attempt = 0
+            while attempt < max_retries:
+                try:
+                    info = ydl.extract_info(query, download=False)
+                    if 'entries' in info:
+                        video = choose_best_video(info['entries'], duration)
+                    else:
+                        video = info
 
-                results.append({
-                    'Artist': artist,
-                    'Title': title,
-                    'YouTube Link': f"https://www.youtube.com/watch?v={video['id']}",
-                    'Video Title': video.get('title', ''),
-                    'Uploader': video.get('uploader', ''),
-                    'Duration (s)': video.get('duration', '')
-                })
-            except Exception as e:
-                results.append({
-                    'Artist': artist,
-                    'Title': title,
-                    'YouTube Link': 'NOT FOUND',
-                    'Video Title': '',
-                    'Uploader': '',
-                    'Duration (s)': ''
-                })
+                    results.append({
+                        'Artist': artist,
+                        'Title': title,
+                        'YouTube Link': f"https://www.youtube.com/watch?v={video['id']}",
+                        'Video Title': video.get('title', ''),
+                        'Uploader': video.get('uploader', ''),
+                        'Duration (s)': video.get('duration', '')
+                    })
+                except Exception as e:
+                    msg = str(e).lower()
+                    print(f"❌ Error intento {attempt}: {e}")
+                    if "429" in msg or "rate limit" in msg:
+                        print("🔁 Rate limited, cambiando IP con Tor...")
+                        renew_tor_ip()
+                        time.sleep(5)
+                        attempt += 1
+                    else:
+                        results.append({
+                            'Artist': artist,
+                            'Title': title,
+                            'YouTube Link': 'NOT FOUND',
+                            'Video Title': '',
+                            'Uploader': '',
+                            'Duration (s)': ''
+                        })
 
     df_new = pd.DataFrame(results)
     if os.path.exists(output_csv):

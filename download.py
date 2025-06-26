@@ -7,8 +7,16 @@ from multiprocessing import Process
 from datetime import datetime
 from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3
+import time
+import stem
+import stem.control
 
 FFMPEG_PATH = r"D:\APPS\ffmpeg\bin\ffmpeg.exe"
+
+def renew_tor_ip():
+    with stem.control.Controller.from_port(port=9051) as controller:
+        controller.authenticate()
+        controller.signal(stem.Signal.NEWNYM)
 
 def set_mp3_metadata(filepath, title, artist, album):
     try:
@@ -50,7 +58,7 @@ def get_audio_duration(path):
         return None
 
 # === Función principal para un CSV ===
-def process_csv(file_name):
+def process_csv(file_name, max_retries=3):
     export_dir = 'exports'
     downloads_dir = 'downloads'
     logs_dir = 'logs'
@@ -110,20 +118,32 @@ def process_csv(file_name):
                     print(f"[{idx+1}] 🔁 Duración incorrecta. Se re-descarga.")
 
             print(f"[{idx+1}] ⬇️ Descargando: {artist} - {title}")
-            try:
-                ydl.download([url])
-                
-                # Buscar archivo MP3 generado (basado en título del video)
-                mp3_path = os.path.join(download_path, f"{video_title}.mp3")
-                if os.path.exists(mp3_path):
-                    set_mp3_metadata(
-                        filepath=mp3_path,
-                        title=title,
-                        artist=artist,
-                        album=name_without_ext
-                    )
-            except Exception as e:
-                print(f"❌ Error al descargar {url}: {e}")
+            
+            attempt = 0
+            while attempt < max_retries:
+                try:
+                    ydl.download([url])
+                    
+                    # Buscar archivo MP3 generado (basado en título del video)
+                    mp3_path = os.path.join(download_path, f"{video_title}.mp3")
+                    if os.path.exists(mp3_path):
+                        set_mp3_metadata(
+                            filepath=mp3_path,
+                            title=title,
+                            artist=artist,
+                            album=name_without_ext
+                        )
+                except Exception as e:
+                    attempt += 1
+                    msg = str(e).lower()
+                    print(f"❌ Error intento {attempt}: {e}")
+                    if "429" in msg or "rate limit" in msg:
+                        print("🔁 Rate limited, cambiando IP con Tor...")
+                        renew_tor_ip()
+                        time.sleep(5)
+                        ydl.download([url])  # intento 2
+                    else:
+                        print(f"❌ Error al descargar {url}: {e}")
 
     print(f"\n✅ Finalizado: {file_name} — {datetime.now()}\n")
 

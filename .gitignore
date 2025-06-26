@@ -1,4 +1,7 @@
 exportify/*.csv
+exportify/** */
 exports/*.csv
 exports/*.txt
-downloads/*.mp3
+exports/**
+downloads/*
+downloads/**

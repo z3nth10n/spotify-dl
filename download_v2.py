@@ -8,6 +8,8 @@ from yt_dlp import YoutubeDL
 from tqdm import tqdm
 from time import sleep, time
 from threading import Thread
+import stem
+import stem.control
 
 # CONFIGURACIÓN
 EXPORTS_DIR = 'exports'
@@ -16,6 +18,11 @@ LOGS_DIR = 'logs'
 FFMPEG_PATH = r'D:\APPS\ffmpeg\bin\ffmpeg.exe'  # Asegúrate de ajustar según tu sistema
 
 CONCURRENCY = 5  # máximo de descargas simultáneas
+
+def renew_tor_ip():
+    with stem.control.Controller.from_port(port=9051) as controller:
+        controller.authenticate()
+        controller.signal(stem.Signal.NEWNYM)
 
 # Función para obtener la duración real de un archivo
 def get_audio_duration(path):
@@ -42,7 +49,7 @@ def set_mp3_metadata(filepath, title, artist, album):
         print(f"[{filepath}] ⚠️ Error asignando metadatos: {e}")
 
 # Worker para descargar en paralelo
-def download_worker(q, progress_q, idx):
+def download_worker(q, progress_q, idx, max_retries=3):
     ydl_opts = {
         'format': 'bestaudio/best',
         'outtmpl': None,  # se asigna por tarea
@@ -78,12 +85,23 @@ def download_worker(q, progress_q, idx):
         # Asignar plantilla de salida al worker
         ydl_opts['outtmpl'] = os.path.join(outdir, '%(title)s.%(ext)s')
 
-        try:
-            with YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-        except Exception as e:
-            progress_q.put((idx, f"❌ Error: {e}"))
-            continue
+        attempt = 0
+        while attempt < max_retries:
+            try:
+                with YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([url])
+            except Exception as e:
+                attempt += 1
+                msg = str(e).lower()
+                print(f"❌ Error intento {attempt}: {e}")
+                if "429" in msg or "rate limit" in msg:
+                    print("🔁 Rate limited, cambiando IP con Tor...")
+                    renew_tor_ip()
+                    time.sleep(5)
+                    ydl.download([url])  # intento 2
+                else:
+                    progress_q.put((idx, f"❌ Error: {e}"))
+                    continue
 
         # Metadatos
         final_path = os.path.join(outdir, f"{video_title}.mp3")
