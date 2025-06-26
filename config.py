@@ -12,7 +12,7 @@ EXPORT_DIR = "exportify"
 EXPORT_RESULT_DIR = "exports"
 DOWNLOADS_DIR = 'downloads'
 LOGS_DIR = 'logs'
-FFMPEG_PATH = r"D:\APPS\ffmpeg\bin\ffmpeg.exe"
+FFMPEG_PATH = r"/usr/bin/ffmpeg"
 
 def renew_tor_ip():
     with stem.control.Controller.from_port(port=9051) as controller:

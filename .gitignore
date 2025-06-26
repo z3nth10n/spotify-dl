@@ -5,3 +5,4 @@ exports/*.txt
 exports/**
 downloads/*
 downloads/**
+venv/
