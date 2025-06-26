@@ -6,3 +6,4 @@ exports/**
 downloads/*
 downloads/**
 venv/
+__pycache__/

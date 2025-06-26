@@ -3,7 +3,7 @@ import stem, stem.control
 # config.py
 
 # Habilita o deshabilita el uso de torsocks + privoxy + tor
-USE_TORSOCKS = True
+USE_TORSOCKS = False
 
 # Dirección del proxy HTTP local provisto por Privoxy (redirige a Tor)
 TOR_PROXY = 'http://127.0.0.1:8118'

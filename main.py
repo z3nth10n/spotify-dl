@@ -204,6 +204,11 @@ def main():
 
         # Guardar archivo temporal para procesar
         temp_path = os.path.join(EXPORT_DIR, "_all_combined_filtered.csv")
+        
+        # Eliminar archivo temporal si ya existe
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        
         df_all.to_csv(temp_path, index=False)
         process_file_sequential(df_all, name_override="combined")
         os.remove(temp_path)
