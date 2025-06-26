@@ -29,7 +29,7 @@ except (ValueError, IndexError):
 file_path = os.path.join(spotify_dir, selected_file)
 df = pd.read_csv(file_path)
 df_unique = df[['Artist Name(s)', 'Track Name']].drop_duplicates()
-df_unique['Artist'] = df_unique['Artist Name(s)'].apply(lambda x: x.split(',')[0].strip())
+df_unique['Artist'] = df_unique['Artist Name(s)'].apply(lambda x: x.split(',')[0].strip() if pd.notna(x) else 'Unknown')
 df_unique['search_query'] = df_unique['Artist'] + " - " + df_unique['Track Name'] + " audio"
 
 # --- Leer cache si existe ---
