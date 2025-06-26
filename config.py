@@ -14,7 +14,22 @@ DOWNLOADS_DIR = 'downloads'
 LOGS_DIR = 'logs'
 FFMPEG_PATH = r"/usr/bin/ffmpeg"
 
-DEBUG_MODE = True
+DEBUG_MODE = False
+
+# --- yt_dlp settings ---
+ydl_opts = {
+    'quiet': True,
+    'skip_download': True,
+    'extract_flat': 'in_playlist',
+    'default_search': 'ytsearch1',
+}
+
+if USE_TORSOCKS:
+        ydl_opts['proxy'] = TOR_PROXY
+        
+if DEBUG_MODE:
+        ydl_opts['quiet'] = False
+        ydl_opts['verbose'] = True
 
 def renew_tor_ip():
     with stem.control.Controller.from_port(port=9051) as controller:

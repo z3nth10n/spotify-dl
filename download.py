@@ -129,6 +129,8 @@ def process_csv(file_name, max_retries=3):
                             artist=artist,
                             album=name_without_ext
                         )
+                    
+                    break
                 except Exception as e:
                     attempt += 1
                     msg = str(e).lower()

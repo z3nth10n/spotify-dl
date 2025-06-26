@@ -82,6 +82,7 @@ def download_worker(q, progress_q, idx, max_retries=3):
             try:
                 with YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
+                break
             except Exception as e:
                 attempt += 1
                 msg = str(e).lower()

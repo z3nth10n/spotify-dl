@@ -1,4 +1,3 @@
-import csv
 import os
 
 import pandas as pd
@@ -7,23 +6,14 @@ from yt_dlp import YoutubeDL
 from tqdm import tqdm
 
 import time
+import sys
 
-from config import USE_TORSOCKS, TOR_PROXY, EXPORT_DIR, EXPORT_RESULT_DIR, DEBUG_MODE, renew_tor_ip
+import traceback
+
+from config import EXPORT_DIR, EXPORT_RESULT_DIR, DEBUG_MODE, renew_tor_ip, ydl_opts
 
 # --- Configuración de carpetas ---
 os.makedirs(EXPORT_RESULT_DIR, exist_ok=True)
-
-# --- yt_dlp settings ---
-ydl_opts = {
-    'quiet': True,
-    'skip_download': True,
-    'extract_flat': 'in_playlist',
-    'default_search': 'ytsearch10',
-    'extract_flat': True  # solo metadatos, no descarga
-}
-
-if USE_TORSOCKS:
-    ydl_opts['proxy'] = TOR_PROXY
 
 def choose_best_video(results, expected_duration=None):
     best = None
@@ -84,22 +74,9 @@ def process_file_sequential(file_or_df, name_override=None, max_retries=3):
     to_process = df[~df.apply(lambda row: (row['Artist'], row['Track Name']) in already_done, axis=1)]
 
     print(f"🔍 Encontradas {len(to_process)} canciones nuevas para buscar (de {len(df)} totales).\n")
-
-    ydl_opts = {
-        'quiet': True,
-        'skip_download': True,
-        'extract_flat': False,
-        'default_search': 'ytsearch10',
-    }
-    
-    if USE_TORSOCKS:
-        ydl_opts['proxy'] = TOR_PROXY
-        
-    if DEBUG_MODE:
-        ydl_opts['quiet'] = False
-        ydl_opts['verbose'] = True
-
     print(f"🔍 Buscando {len(to_process)} canciones una por una...\n")
+    
+    # print(ydl_opts)
 
     with YoutubeDL(ydl_opts) as ydl:
         for _, row in tqdm(to_process.iterrows(), total=len(to_process)):
@@ -116,6 +93,8 @@ def process_file_sequential(file_or_df, name_override=None, max_retries=3):
                         video = choose_best_video(info['entries'], duration)
                     else:
                         video = info
+                        
+                    print(video)
 
                     results.append({
                         'Artist': artist,
@@ -125,7 +104,11 @@ def process_file_sequential(file_or_df, name_override=None, max_retries=3):
                         'Uploader': video.get('uploader', ''),
                         'Duration (s)': video.get('duration', '')
                     })
+                    break
                 except Exception as e:
+                    # print(e)
+                    # traceback.print_exc() 
+                    # sys.exit(1)
                     msg = str(e).lower()
                     print(f"❌ Error intento {attempt}: {e}")
                     if "429" in msg or "rate limit" in msg:
