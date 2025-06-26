@@ -14,6 +14,8 @@ DOWNLOADS_DIR = 'downloads'
 LOGS_DIR = 'logs'
 FFMPEG_PATH = r"/usr/bin/ffmpeg"
 
+DEBUG_MODE = True
+
 def renew_tor_ip():
     with stem.control.Controller.from_port(port=9051) as controller:
         controller.authenticate()

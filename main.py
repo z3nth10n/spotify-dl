@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 import time
 
-from config import USE_TORSOCKS, TOR_PROXY, EXPORT_DIR, EXPORT_RESULT_DIR, renew_tor_ip
+from config import USE_TORSOCKS, TOR_PROXY, EXPORT_DIR, EXPORT_RESULT_DIR, DEBUG_MODE, renew_tor_ip
 
 # --- Configuración de carpetas ---
 os.makedirs(EXPORT_RESULT_DIR, exist_ok=True)
@@ -91,6 +91,13 @@ def process_file_sequential(file_or_df, name_override=None, max_retries=3):
         'extract_flat': False,
         'default_search': 'ytsearch10',
     }
+    
+    if USE_TORSOCKS:
+        ydl_opts['proxy'] = TOR_PROXY
+        
+    if DEBUG_MODE:
+        ydl_opts['quiet'] = False
+        ydl_opts['verbose'] = True
 
     print(f"🔍 Buscando {len(to_process)} canciones una por una...\n")
 
