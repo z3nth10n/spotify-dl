@@ -21,7 +21,7 @@ ydl_opts = {
     'quiet': True,
     'skip_download': True,
     'extract_flat': 'in_playlist',
-    'default_search': 'ytsearch1',
+    'default_search': 'ytsearch10',
 }
 
 if USE_TORSOCKS:

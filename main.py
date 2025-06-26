@@ -94,7 +94,7 @@ def process_file_sequential(file_or_df, name_override=None, max_retries=3):
                     else:
                         video = info
                         
-                    print(video)
+                    # print(video)
 
                     results.append({
                         'Artist': artist,
