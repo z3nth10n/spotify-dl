@@ -1,5 +1,5 @@
 exportify/*.csv
-exportify/** */
+exportify/**
 exports/*.csv
 exports/*.txt
 exports/**

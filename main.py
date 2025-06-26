@@ -7,17 +7,10 @@ from yt_dlp import YoutubeDL
 from tqdm import tqdm
 
 import time
-import stem
-import stem.control
 
-def renew_tor_ip():
-    with stem.control.Controller.from_port(port=9051) as controller:
-        controller.authenticate()
-        controller.signal(stem.Signal.NEWNYM)
+from config import USE_TORSOCKS, TOR_PROXY, EXPORT_DIR, EXPORT_RESULT_DIR, renew_tor_ip
 
 # --- Configuración de carpetas ---
-EXPORT_DIR = "exportify"
-EXPORT_RESULT_DIR = "exports"
 os.makedirs(EXPORT_RESULT_DIR, exist_ok=True)
 
 # --- yt_dlp settings ---
@@ -28,6 +21,9 @@ ydl_opts = {
     'default_search': 'ytsearch10',
     'extract_flat': True  # solo metadatos, no descarga
 }
+
+if USE_TORSOCKS:
+    ydl_opts['proxy'] = TOR_PROXY
 
 def choose_best_video(results, expected_duration=None):
     best = None

@@ -8,15 +8,8 @@ from datetime import datetime
 from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3
 import time
-import stem
-import stem.control
 
-FFMPEG_PATH = r"D:\APPS\ffmpeg\bin\ffmpeg.exe"
-
-def renew_tor_ip():
-    with stem.control.Controller.from_port(port=9051) as controller:
-        controller.authenticate()
-        controller.signal(stem.Signal.NEWNYM)
+from config import USE_TORSOCKS, TOR_PROXY, FFMPEG_PATH, renew_tor_ip
 
 def set_mp3_metadata(filepath, title, artist, album):
     try:
@@ -92,6 +85,9 @@ def process_csv(file_name, max_retries=3):
         'quiet': False,
         'no_warnings': True,
     }
+    
+    if USE_TORSOCKS:
+        ydl_opts['proxy'] = TOR_PROXY
 
     print(f"\n--- Procesando {file_name} ({len(df_valid)} canciones) ---")
     print(f"Hora de inicio: {datetime.now()}\n")

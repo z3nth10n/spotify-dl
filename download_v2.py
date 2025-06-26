@@ -8,21 +8,10 @@ from yt_dlp import YoutubeDL
 from tqdm import tqdm
 from time import sleep, time
 from threading import Thread
-import stem
-import stem.control
 
-# CONFIGURACIÓN
-EXPORTS_DIR = 'exports'
-DOWNLOADS_DIR = 'downloads'
-LOGS_DIR = 'logs'
-FFMPEG_PATH = r'D:\APPS\ffmpeg\bin\ffmpeg.exe'  # Asegúrate de ajustar según tu sistema
+from config import USE_TORSOCKS, TOR_PROXY, DOWNLOADS_DIR, EXPORT_RESULT_DIR, FFMPEG_PATH, LOGS_DIR, renew_tor_ip
 
 CONCURRENCY = 5  # máximo de descargas simultáneas
-
-def renew_tor_ip():
-    with stem.control.Controller.from_port(port=9051) as controller:
-        controller.authenticate()
-        controller.signal(stem.Signal.NEWNYM)
 
 # Función para obtener la duración real de un archivo
 def get_audio_duration(path):
@@ -64,6 +53,9 @@ def download_worker(q, progress_q, idx, max_retries=3):
         'quiet': True,
         'no_warnings': True,
     }
+    
+    if USE_TORSOCKS:
+        ydl_opts['proxy'] = TOR_PROXY
 
     while not q.empty():
         try:
@@ -143,11 +135,11 @@ def main():
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
     os.makedirs(LOGS_DIR, exist_ok=True)
 
-    csv_files = [f for f in os.listdir(EXPORTS_DIR) if f.endswith('.csv')]
+    csv_files = [f for f in os.listdir(EXPORT_RESULT_DIR) if f.endswith('.csv')]
     tasks = []
 
     for file in csv_files:
-        df = pd.read_csv(os.path.join(EXPORTS_DIR, file))
+        df = pd.read_csv(os.path.join(EXPORT_RESULT_DIR, file))
         df_valid = df[df['YouTube Link'].notna() & (df['YouTube Link'] != 'NOT FOUND')]
 
         outdir = os.path.join(DOWNLOADS_DIR, os.path.splitext(file)[0])
