@@ -7,3 +7,4 @@ downloads/*
 downloads/**
 venv/
 __pycache__/
+logs/
