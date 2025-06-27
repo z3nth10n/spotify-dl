@@ -17,7 +17,7 @@ from config import USE_TORSOCKS, TOR_PROXY, DOWNLOADS_DIR, EXPORT_RESULT_DIR, FF
 
 CONCURRENCY = 5  # máximo de descargas simultáneas
 
-loggers = defaultdict(Logger)
+# loggers = defaultdict(Logger)
 
 # @todo: add logging to tqdm
 # def setup_logger(out_name):
@@ -70,6 +70,8 @@ def set_mp3_metadata(filepath, title, artist, album):
 # Worker para descargar en paralelo
 def download_worker(q, progress_q, idx, max_retries=3):
     ydl_opts = {
+        # 'cookiesfrombrowser': ('firefox', None, None, None),
+        'cookiefile': 'cookies.txt',
         'format': 'bestaudio/best',
         'outtmpl': None,  # se asigna por tarea
         'postprocessors': [{
@@ -176,7 +178,7 @@ def main():
         outdir = os.path.join(DOWNLOADS_DIR, filename)
         os.makedirs(outdir, exist_ok=True)
         
-        logger = setup_logger(filename)
+        # logger = setup_logger(filename)
         # loggers[filename].add(logger)
 
         for _, row in df_valid.iterrows():
