@@ -129,7 +129,7 @@ def process(file_or_df, name_override=None, max_retries=3):
                 
                 # Abrir escritor si no existe
                 if source_file not in open_writers:
-                    f = open(output_path, mode='w', newline='', encoding='utf-8')
+                    f = open(output_path, mode='a', newline='', encoding='utf-8')
                     writer = csv.writer(f)
                     
                     # Escribir cabecera solo si el archivo está vacío
@@ -155,14 +155,14 @@ def process(file_or_df, name_override=None, max_retries=3):
                             
                         video_link = f"https://www.youtube.com/watch?v={video['id']}"
 
-                        open_writers[source_file][1].writerow({
+                        open_writers[source_file][1].writerow([
                             artist,
                             title,
                             video_link,
                             video.get('title', ''),
                             video.get('uploader', ''),
                             video.get('duration', '')
-                        })
+                        ])
                         
                         f = open_writers[source_file][0]
                         f.flush()
@@ -189,9 +189,9 @@ def process(file_or_df, name_override=None, max_retries=3):
                             
                             written_rows[source_file].add(key)
                             
-                            open_writers[source_file][1].writerow({
+                            open_writers[source_file][1].writerow([
                                 artist, title, 'NOT FOUND', '', '', ''
-                            })
+                            ])
                             break
                         break
     finally:
@@ -202,12 +202,16 @@ def process(file_or_df, name_override=None, max_retries=3):
     logger.info(f"\n✅ Resultados actualizados en: {output_csv}")
 
 def get_cached_pairs():
-    """Lee todos los archivos en EXPORT_RESULT_DIR y devuelve un set de (Artist, Title) ya procesados"""
+    """Lee todos los archivos en EXPORT_RESULT_DIR y devuelve un set de (artist, title) normalizado"""
     cached = set()
     for f in os.listdir(EXPORT_RESULT_DIR):
-        if not f.endswith('.csv'):
+        if not f.endswith('.csv') or f.startswith("_"):
             continue
         df = pd.read_csv(os.path.join(EXPORT_RESULT_DIR, f))
+        if 'Artist' not in df.columns or 'Title' not in df.columns:
+            continue  # Saltar si no es un CSV de resultados válidos
+        df['Artist'] = df['Artist'].fillna('').str.strip().str.lower()
+        df['Title'] = df['Title'].fillna('').str.strip().str.lower()
         for _, row in df.iterrows():
             cached.add((row['Artist'], row['Title']))
     return cached
@@ -220,20 +224,31 @@ def infer_artist(row):
     else:
         return 'unknown'
 
-def concatenate_all_exports():
+def concatenate_all_exports(cached_pairs):
     dfs = []
     for file in os.listdir(EXPORT_DIR):
-        if not file.endswith('.csv'):
+        if not file.endswith('.csv') or file.startswith("_"):
             continue
+
         df = pd.read_csv(os.path.join(EXPORT_DIR, file))
         df = df[['Artist Name(s)', 'Track Name', 'Duration (ms)']].drop_duplicates()
         df["Source File"] = os.path.splitext(file)[0]
-        df['Artist'] = df['Artist Name(s)'].apply(lambda x: str(x).split(',')[0].strip() if pd.notna(x) else 'Unknown')
-        df['Expected Duration (s)'] = df['Duration (ms)'] / 1000
         df['Artist'] = df.apply(infer_artist, axis=1)
-        
-        dfs.append(df)
-    
+        df['Expected Duration (s)'] = df['Duration (ms)'] / 1000
+
+        # Normalizar para la clave
+        df['Artist'] = df['Artist'].fillna('').str.strip().str.lower()
+        df['Track Name'] = df['Track Name'].fillna('').str.strip().str.lower()
+
+        df['__key__'] = list(zip(df['Artist'], df['Track Name']))
+        df = df[~df['__key__'].isin(cached_pairs)].drop(columns='__key__')
+
+        if not df.empty:
+            dfs.append(df)
+
+    if not dfs:
+        return pd.DataFrame()
+
     return pd.concat(dfs, ignore_index=True)
 
 def main():
@@ -246,11 +261,6 @@ def main():
         # Guardar archivo temporal para procesar
         temp_path = os.path.join(EXPORT_DIR, "_all_combined_filtered.csv")
         
-        # # Eliminar archivo temporal si ya existe
-        # if os.path.exists(temp_path):
-        #     os.remove(temp_path)
-        #     assert not os.path.exists(temp_path), "❌ El archivo no fue eliminado correctamente"
-
         print("Opciones disponibles:")
         print("0. 🔄 Procesar todos los CSV")
         for i, file in enumerate(files, 1):
@@ -264,9 +274,7 @@ def main():
                 print("👋 Saliendo del programa.")
                 break
         elif choice == '0':
-            df_all = concatenate_all_exports()
-            df_all['__cache_key__'] = df_all.apply(lambda row: (infer_artist(row), row['Track Name']), axis=1)
-            df_all = df_all[~df_all['__cache_key__'].isin(cached_pairs)].drop(columns='__cache_key__')
+            df_all = concatenate_all_exports(cached_pairs)
 
             if df_all.empty:
                 print("✅ Todo ya está procesado según la caché.")
