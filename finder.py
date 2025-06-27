@@ -94,16 +94,22 @@ def process(file_or_df, name_override=None, max_retries=3):
     # --- Cargar CSV original ---
     if 'Artist' not in df.columns:
         df = df[['Artist Name(s)', 'Track Name', 'Duration (ms)']].drop_duplicates()
-        df['Artist'] = df['Artist Name(s)'].apply(lambda x: str(x).split(',')[0].strip() if pd.notna(x) else 'Unknown')
+
+    # Normalización de columnas clave
+    df['Artist'] = df.apply(infer_artist, axis=1)
+    df['Artist'] = df['Artist'].fillna('').str.strip().str.lower()
+    df['Track Name'] = df['Track Name'].fillna('').str.strip().str.lower()
 
     output_csv = os.path.join(EXPORT_RESULT_DIR, f"{out_name}.csv")
 
     already_done = set()
     if os.path.exists(output_csv):
         df_done = pd.read_csv(output_csv)
+        df_done['Artist'] = df_done['Artist'].fillna('').str.strip().str.lower()
+        df_done['Title'] = df_done['Title'].fillna('').str.strip().str.lower()
         already_done = set(zip(df_done['Artist'], df_done['Title']))
 
-    to_process = df[~df.apply(lambda row: (row['Artist'], row['Track Name']) in already_done, axis=1)]
+    to_process = df[~df.apply(lambda r: (r['Artist'], r['Track Name']) in already_done, axis=1)]
 
     logger.info(f"🔍 Encontradas {len(to_process)} canciones nuevas para buscar (de {len(df)} totales).\n")
     logger.info(f"🔍 Buscando {len(to_process)} canciones una por una...\n")
@@ -207,57 +213,27 @@ def get_cached_pairs():
     return cached
 
 def infer_artist(row):
-    if pd.notna(row['Artist Name(s)']):
-        return str(row['Artist Name(s)']).split(',')[0].strip()
+    if pd.notna(row['Artist Name(s)']) and row['Artist Name(s)'].strip():
+        return str(row['Artist Name(s)']).split(',')[0].strip().lower()
     elif pd.notna(row['Track Name']) and '-' in row['Track Name']:
-        return row['Track Name'].split('-')[0].strip()
+        return row['Track Name'].split('-')[0].strip().lower()
     else:
-        return 'Unknown'
+        return 'unknown'
 
 def concatenate_all_exports():
     dfs = []
-
-    # 🧠 1. Cargar caché de resultados previos
-    cached_pairs = set()
-    for file in os.listdir(EXPORT_RESULT_DIR):
+    for file in os.listdir(EXPORT_DIR):
         if not file.endswith('.csv'):
             continue
-        path = os.path.join(EXPORT_RESULT_DIR, file)
-        try:
-            df_result = pd.read_csv(path)
-            if 'Artist' in df_result.columns and 'Title' in df_result.columns:
-                cached_pairs.update(zip(df_result['Artist'], df_result['Title']))
-        except Exception as e:
-            print(f"⚠️ No se pudo leer {file}: {e}")
-
-    # 🧱 2. Procesar archivos del export original
-    for file in os.listdir(EXPORT_DIR):
-        if not file.endswith('.csv') or file.startswith("_"):
-            continue
-
-        path = os.path.join(EXPORT_DIR, file)
-        try:
-            df = pd.read_csv(path)
-            df = df[['Artist Name(s)', 'Track Name', 'Duration (ms)']].drop_duplicates()
-            df["Source File"] = os.path.splitext(file)[0]
-            df['Artist'] = df['Artist Name(s)'].apply(lambda x: str(x).split(',')[0].strip() if pd.notna(x) else 'Unknown')
-            df['Expected Duration (s)'] = df['Duration (ms)'] / 1000
-            df['Artist'] = df.apply(infer_artist, axis=1)
-
-            # 🔍 3. Filtrar por caché (ya procesados)
-            df['__key__'] = list(zip(df['Artist'], df['Track Name']))
-            df = df[~df['__key__'].isin(cached_pairs)].drop(columns='__key__')
-
-            if not df.empty:
-                dfs.append(df)
-        except Exception as e:
-            print(f"❌ Error procesando {file}: {e}")
-
-    # ✅ 4. Combinar todos los que quedan
-    if not dfs:
-        print("✅ No hay archivos nuevos que procesar.")
-        return pd.DataFrame()
-
+        df = pd.read_csv(os.path.join(EXPORT_DIR, file))
+        df = df[['Artist Name(s)', 'Track Name', 'Duration (ms)']].drop_duplicates()
+        df["Source File"] = os.path.splitext(file)[0]
+        df['Artist'] = df['Artist Name(s)'].apply(lambda x: str(x).split(',')[0].strip() if pd.notna(x) else 'Unknown')
+        df['Expected Duration (s)'] = df['Duration (ms)'] / 1000
+        df['Artist'] = df.apply(infer_artist, axis=1)
+        
+        dfs.append(df)
+    
     return pd.concat(dfs, ignore_index=True)
 
 def main():
