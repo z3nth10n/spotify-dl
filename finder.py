@@ -216,23 +216,53 @@ def infer_artist(row):
 
 def concatenate_all_exports():
     dfs = []
-    for file in os.listdir(EXPORT_DIR):
+
+    # 🧠 1. Cargar caché de resultados previos
+    cached_pairs = set()
+    for file in os.listdir(EXPORT_RESULT_DIR):
         if not file.endswith('.csv'):
             continue
-        df = pd.read_csv(os.path.join(EXPORT_DIR, file))
-        df = df[['Artist Name(s)', 'Track Name', 'Duration (ms)']].drop_duplicates()
-        df["Source File"] = os.path.splitext(file)[0]
-        df['Artist'] = df['Artist Name(s)'].apply(lambda x: str(x).split(',')[0].strip() if pd.notna(x) else 'Unknown')
-        df['Expected Duration (s)'] = df['Duration (ms)'] / 1000
-        df['Artist'] = df.apply(infer_artist, axis=1)
-        
-        dfs.append(df)
-    
+        path = os.path.join(EXPORT_RESULT_DIR, file)
+        try:
+            df_result = pd.read_csv(path)
+            if 'Artist' in df_result.columns and 'Title' in df_result.columns:
+                cached_pairs.update(zip(df_result['Artist'], df_result['Title']))
+        except Exception as e:
+            print(f"⚠️ No se pudo leer {file}: {e}")
+
+    # 🧱 2. Procesar archivos del export original
+    for file in os.listdir(EXPORT_DIR):
+        if not file.endswith('.csv') or file.startswith("_"):
+            continue
+
+        path = os.path.join(EXPORT_DIR, file)
+        try:
+            df = pd.read_csv(path)
+            df = df[['Artist Name(s)', 'Track Name', 'Duration (ms)']].drop_duplicates()
+            df["Source File"] = os.path.splitext(file)[0]
+            df['Artist'] = df['Artist Name(s)'].apply(lambda x: str(x).split(',')[0].strip() if pd.notna(x) else 'Unknown')
+            df['Expected Duration (s)'] = df['Duration (ms)'] / 1000
+            df['Artist'] = df.apply(infer_artist, axis=1)
+
+            # 🔍 3. Filtrar por caché (ya procesados)
+            df['__key__'] = list(zip(df['Artist'], df['Track Name']))
+            df = df[~df['__key__'].isin(cached_pairs)].drop(columns='__key__')
+
+            if not df.empty:
+                dfs.append(df)
+        except Exception as e:
+            print(f"❌ Error procesando {file}: {e}")
+
+    # ✅ 4. Combinar todos los que quedan
+    if not dfs:
+        print("✅ No hay archivos nuevos que procesar.")
+        return pd.DataFrame()
+
     return pd.concat(dfs, ignore_index=True)
 
 def main():
     while True:
-        files = [f for f in os.listdir(EXPORT_DIR) if f.endswith('.csv')]
+        files = [f for f in os.listdir(EXPORT_DIR) if f.endswith('.csv') and not f.startswith('_all_combined_filtered')]
         if not files:
             print("❌ No se encontraron archivos CSV en la carpeta 'spotify/'.")
             return
@@ -240,10 +270,10 @@ def main():
         # Guardar archivo temporal para procesar
         temp_path = os.path.join(EXPORT_DIR, "_all_combined_filtered.csv")
         
-        # Eliminar archivo temporal si ya existe
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-            assert not os.path.exists(temp_path), "❌ El archivo no fue eliminado correctamente"
+        # # Eliminar archivo temporal si ya existe
+        # if os.path.exists(temp_path):
+        #     os.remove(temp_path)
+        #     assert not os.path.exists(temp_path), "❌ El archivo no fue eliminado correctamente"
 
         print("Opciones disponibles:")
         print("0. 🔄 Procesar todos los CSV")
