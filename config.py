@@ -1,4 +1,5 @@
 import stem, stem.control
+import os
 
 # config.py
 
@@ -35,3 +36,8 @@ def renew_tor_ip():
     with stem.control.Controller.from_port(port=9051) as controller:
         controller.authenticate()
         controller.signal(stem.Signal.NEWNYM)
+        
+# --- Configuración de carpetas ---
+os.makedirs(EXPORT_RESULT_DIR, exist_ok=True)
+os.makedirs(EXPORT_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)

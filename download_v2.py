@@ -134,9 +134,6 @@ def progress_monitor(total_tasks, progress_q):
 
 # Main
 def main():
-    os.makedirs(DOWNLOADS_DIR, exist_ok=True)
-    os.makedirs(LOGS_DIR, exist_ok=True)
-
     csv_files = [f for f in os.listdir(EXPORT_RESULT_DIR) if f.endswith('.csv')]
     tasks = []
 

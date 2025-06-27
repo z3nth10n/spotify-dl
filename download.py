@@ -9,7 +9,7 @@ from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3
 import time
 
-from config import USE_TORSOCKS, TOR_PROXY, FFMPEG_PATH, renew_tor_ip
+from config import USE_TORSOCKS, TOR_PROXY, FFMPEG_PATH, LOGS_DIR, EXPORT_RESULT_DIR, renew_tor_ip
 
 def set_mp3_metadata(filepath, title, artist, album):
     try:
@@ -52,18 +52,12 @@ def get_audio_duration(path):
 
 # === Función principal para un CSV ===
 def process_csv(file_name, max_retries=3):
-    export_dir = 'exports'
-    downloads_dir = 'downloads'
-    logs_dir = 'logs'
-    os.makedirs(downloads_dir, exist_ok=True)
-    os.makedirs(logs_dir, exist_ok=True)
-
     name_without_ext = os.path.splitext(file_name)[0]
-    download_path = os.path.join(downloads_dir, name_without_ext)
+    download_path = os.path.join(EXPORT_RESULT_DIR, name_without_ext)
     os.makedirs(download_path, exist_ok=True)
 
     # Redirigir consola a log
-    log_path = os.path.join(logs_dir, f"{name_without_ext}.log")
+    log_path = os.path.join(LOGS_DIR, f"{name_without_ext}.log")
     sys.stdout = Tee(log_path)
     sys.stderr = sys.stdout  # Capturar también errores
 

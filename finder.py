@@ -14,9 +14,6 @@ from config import LOGS_DIR, EXPORT_DIR, EXPORT_RESULT_DIR, USE_TORSOCKS, renew_
 # import traceback
 # from datetime import datetime
 
-# --- Configuración de carpetas ---
-os.makedirs(EXPORT_RESULT_DIR, exist_ok=True)
-
 def setup_logger(out_name):
     log_path = os.path.join(LOGS_DIR, f"{out_name}.log")
     
