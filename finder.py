@@ -20,6 +20,7 @@ from config import LOGS_DIR, EXPORT_DIR, EXPORT_RESULT_DIR, USE_TORSOCKS, renew_
 
 # Mapeo de source_file -> (file_handle, csv_writer)
 open_writers = {}
+written_rows = defaultdict(set)
 
 def setup_logger(out_name):
     log_path = os.path.join(LOGS_DIR, f"{out_name}.log")
@@ -102,7 +103,6 @@ def process(file_or_df, name_override=None, max_retries=3):
         df_done = pd.read_csv(output_csv)
         already_done = set(zip(df_done['Artist'], df_done['Title']))
 
-    written_rows = defaultdict(set)
     to_process = df[~df.apply(lambda row: (row['Artist'], row['Track Name']) in already_done, axis=1)]
 
     logger.info(f"🔍 Encontradas {len(to_process)} canciones nuevas para buscar (de {len(df)} totales).\n")
@@ -125,6 +125,7 @@ def process(file_or_df, name_override=None, max_retries=3):
                 if source_file not in open_writers:
                     f = open(output_path, mode='w', newline='', encoding='utf-8')
                     writer = csv.writer(f)
+                    
                     # Escribir cabecera solo si el archivo está vacío
                     if os.stat(output_path).st_size == 0:
                         writer.writerow(['Artist', 'Title', 'YouTube Link', 'Video Title', 'Uploader', 'Duration (s)'])
@@ -170,6 +171,13 @@ def process(file_or_df, name_override=None, max_retries=3):
                             time.sleep(5)
                             attempt += 1
                         else:
+                            key = (artist, title)
+                        
+                            if key in written_rows[source_file]:
+                                break  # Ya se escribió, evitar duplicado. Salir del while
+                            
+                            written_rows[source_file].add(key)
+                            
                             open_writers[source_file][1].writerow({
                                 artist, title, 'NOT FOUND', '', '', ''
                             })
@@ -218,50 +226,54 @@ def concatenate_all_exports():
     return pd.concat(dfs, ignore_index=True)
 
 def main():
-    files = [f for f in os.listdir(EXPORT_DIR) if f.endswith('.csv')]
-    if not files:
-        print("❌ No se encontraron archivos CSV en la carpeta 'spotify/'.")
-        return
-
-    # Guardar archivo temporal para procesar
-    temp_path = os.path.join(EXPORT_DIR, "_all_combined_filtered.csv")
-    
-    # Eliminar archivo temporal si ya existe
-    if os.path.exists(temp_path):
-        os.remove(temp_path)
-        assert not os.path.exists(temp_path), "❌ El archivo no fue eliminado correctamente"
-
-    print("Opciones disponibles:")
-    print("0. 🔄 Procesar todos los CSV")
-    for i, file in enumerate(files, 1):
-        print(f"{i}. {file}")
-
-    choice = input("Selecciona una opción: ")
-
-    cached_pairs = get_cached_pairs()
-
-    if choice == '0':
-        df_all = concatenate_all_exports()
-        df_all['__cache_key__'] = df_all.apply(lambda row: (infer_artist(row), row['Track Name']), axis=1)
-        df_all = df_all[~df_all['__cache_key__'].isin(cached_pairs)].drop(columns='__cache_key__')
-
-        if df_all.empty:
-            print("✅ Todo ya está procesado según la caché.")
+    while True:
+        files = [f for f in os.listdir(EXPORT_DIR) if f.endswith('.csv')]
+        if not files:
+            print("❌ No se encontraron archivos CSV en la carpeta 'spotify/'.")
             return
-        
-        df_all.to_csv(temp_path, index=False)
-        process(df_all, name_override="combined")
-        os.remove(temp_path)
 
-    else:
-        try:
-            idx = int(choice)
-            if idx < 1 or idx > len(files):
-                raise ValueError
-            selected = files[idx - 1]
-            process(os.path.join(EXPORT_DIR, selected))
-        except (IndexError, ValueError):
-            print("❌ Selección inválida.")
+        # Guardar archivo temporal para procesar
+        temp_path = os.path.join(EXPORT_DIR, "_all_combined_filtered.csv")
+        
+        # Eliminar archivo temporal si ya existe
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            assert not os.path.exists(temp_path), "❌ El archivo no fue eliminado correctamente"
+
+        print("Opciones disponibles:")
+        print("0. 🔄 Procesar todos los CSV")
+        for i, file in enumerate(files, 1):
+            print(f"{i}. {file}")
+
+        choice = input("Selecciona una opción: ")
+
+        cached_pairs = get_cached_pairs()
+        
+        if choice == 'q':
+                print("👋 Saliendo del programa.")
+                break
+        elif choice == '0':
+            df_all = concatenate_all_exports()
+            df_all['__cache_key__'] = df_all.apply(lambda row: (infer_artist(row), row['Track Name']), axis=1)
+            df_all = df_all[~df_all['__cache_key__'].isin(cached_pairs)].drop(columns='__cache_key__')
+
+            if df_all.empty:
+                print("✅ Todo ya está procesado según la caché.")
+                return
+            
+            df_all.to_csv(temp_path, index=False)
+            process(df_all, name_override="combined")
+            os.remove(temp_path)
+
+        else:
+            try:
+                idx = int(choice)
+                if idx < 1 or idx > len(files):
+                    raise ValueError
+                selected = files[idx - 1]
+                process(os.path.join(EXPORT_DIR, selected))
+            except (IndexError, ValueError):
+                print("❌ Selección inválida.")
 
 if __name__ == '__main__':
     main()
