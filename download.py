@@ -128,9 +128,9 @@ def process_csv(file_name, max_retries=3):
                     
                     break
                 except Exception as e:
-                    attempt += 1
                     msg = str(e).lower()
                     if "429" in msg or "rate limit" in msg and USE_TORSOCKS:
+                        attempt += 1
                         print(f"❌ Error intento {attempt}: {e} - {query}")
                         print("🔁 Rate limited, cambiando IP con Tor...")
                         renew_tor_ip()
@@ -138,6 +138,7 @@ def process_csv(file_name, max_retries=3):
                         ydl.download([url])  # intento 2
                     else:
                         print(f"❌ Error al descargar {url}: {e} - {query}")
+                        break
 
     print(f"\n✅ Finalizado: {file_name} — {datetime.now()}\n")
 

@@ -85,17 +85,17 @@ def download_worker(q, progress_q, idx, max_retries=3):
                     ydl.download([url])
                 break
             except Exception as e:
-                attempt += 1
                 msg = str(e).lower()
                 print(f"❌ Error intento {attempt}: {e} - {query}")
                 if "429" in msg or "rate limit" in msg and USE_TORSOCKS:
+                    attempt += 1
                     print("🔁 Rate limited, cambiando IP con Tor...")
                     renew_tor_ip()
                     time.sleep(5)
                     ydl.download([url])  # intento 2
                 else:
                     progress_q.put((idx, f"❌ Error: {e}"))
-                    continue
+                    break
 
         # Metadatos
         final_path = os.path.join(outdir, f"{video_title}.mp3")

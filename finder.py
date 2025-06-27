@@ -124,7 +124,6 @@ def process(file_or_df, name_override=None, max_retries=3):
                         'Duration (s)': video.get('duration', '')
                     })
                     
-                    
                     # 🟡 Guardar fila inmediatamente
                     pd.DataFrame([results[-1]]).to_csv(
                         output_csv,
@@ -161,6 +160,8 @@ def process(file_or_df, name_override=None, max_retries=3):
                             header=not os.path.exists(output_csv),
                             index=False
                         )
+                        
+                        break
 
     df_new = pd.DataFrame(results)
 
