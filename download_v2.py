@@ -16,7 +16,7 @@ CONCURRENCY = 5  # máximo de descargas simultáneas
 
 def pascal_to_title_case(text):
     # Inserta espacio antes de cada mayúscula (excepto al inicio), luego capitaliza cada palabra
-    spaced = re.sub(r'(?<!^)(?=[A-Z])', ' ', text)
+    spaced = re.sub(r'(?<!^)(?=[A-Z])', ' ', text).replace("_", " ")
     return spaced.title()
 
 # Función para obtener la duración real de un archivo
