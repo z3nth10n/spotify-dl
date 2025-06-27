@@ -6,5 +6,6 @@ exports/**
 downloads/*
 downloads/**
 venv/
+myenv/
 __pycache__/
 logs/
