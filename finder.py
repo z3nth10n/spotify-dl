@@ -142,12 +142,12 @@ def process(file_or_df, name_override=None, max_retries=3):
                         video_link = f"https://www.youtube.com/watch?v={video['id']}"
 
                         open_writers[source_file][1].writerow({
-                            'Artist': artist,
-                            'Title': title,
-                            'YouTube Link': video_link,
-                            'Video Title': video.get('title', ''),
-                            'Uploader': video.get('uploader', ''),
-                            'Duration (s)': video.get('duration', '')
+                            artist,
+                            title,
+                            video_link,
+                            video.get('title', ''),
+                            video.get('uploader', ''),
+                            video.get('duration', '')
                         })
                         break
                     except Exception as e:
@@ -164,12 +164,7 @@ def process(file_or_df, name_override=None, max_retries=3):
                             attempt += 1
                         else:
                             open_writers[source_file][1].writerow({
-                                'Artist': artist,
-                                'Title': title,
-                                'YouTube Link': 'NOT FOUND',
-                                'Video Title': '',
-                                'Uploader': '',
-                                'Duration (s)': ''
+                                artist, title, 'NOT FOUND', '', '', ''
                             })
                             break
                         break
@@ -214,8 +209,8 @@ def concatenate_all_exports():
         if not file.endswith('.csv'):
             continue
         df = pd.read_csv(os.path.join(EXPORT_DIR, file))
-        df["Source File"] = os.path.splitext(file)[0]
         df = df[['Artist Name(s)', 'Track Name', 'Duration (ms)']].drop_duplicates()
+        df["Source File"] = os.path.splitext(file)[0]
         df['Artist'] = df['Artist Name(s)'].apply(lambda x: str(x).split(',')[0].strip() if pd.notna(x) else 'Unknown')
         df['Expected Duration (s)'] = df['Duration (ms)'] / 1000
         df['Artist'] = df.apply(infer_artist, axis=1)
@@ -230,6 +225,14 @@ def main():
         print("❌ No se encontraron archivos CSV en la carpeta 'spotify/'.")
         return
 
+    # Guardar archivo temporal para procesar
+    temp_path = os.path.join(EXPORT_DIR, "_all_combined_filtered.csv")
+    
+    # Eliminar archivo temporal si ya existe
+    if os.path.exists(temp_path):
+        os.remove(temp_path)
+        assert not os.path.exists(temp_path), "❌ El archivo no fue eliminado correctamente"
+
     print("Opciones disponibles:")
     print("0. 🔄 Procesar todos los CSV")
     for i, file in enumerate(files, 1):
@@ -241,18 +244,12 @@ def main():
 
     if choice == '0':
         df_all = concatenate_all_exports()
-        df_all = df_all[~df_all.apply(lambda row: (str(row['Artist Name(s)']).split(',')[0].strip(), row['Track Name']) in cached_pairs, axis=1)]
+        df_all['__cache_key__'] = df_all.apply(lambda row: (infer_artist(row), row['Track Name']), axis=1)
+        df_all = df_all[~df_all['__cache_key__'].isin(cached_pairs)].drop(columns='__cache_key__')
 
         if df_all.empty:
             print("✅ Todo ya está procesado según la caché.")
             return
-
-        # Guardar archivo temporal para procesar
-        temp_path = os.path.join(EXPORT_DIR, "_all_combined_filtered.csv")
-        
-        # Eliminar archivo temporal si ya existe
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
         
         df_all.to_csv(temp_path, index=False)
         process(df_all, name_override="combined")
