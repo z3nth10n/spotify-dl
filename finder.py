@@ -157,6 +157,11 @@ def process(file_or_df, name_override=None, max_retries=3):
                             video.get('uploader', ''),
                             video.get('duration', '')
                         })
+                        
+                        f = open_writers[source_file][0]
+                        f.flush()
+                        os.fsync(f.fileno())
+                        open_writers[source_file][0].flush()  # flush al file handle
                         break
                     except Exception as e:
                         # print(e)
