@@ -102,7 +102,7 @@ def process(file_or_df, name_override=None, max_retries=3):
         df_done = pd.read_csv(output_csv)
         already_done = set(zip(df_done['Artist'], df_done['Title']))
 
-    results = []
+    written_rows = defaultdict(set)
     to_process = df[~df.apply(lambda row: (row['Artist'], row['Track Name']) in already_done, axis=1)]
 
     logger.info(f"🔍 Encontradas {len(to_process)} canciones nuevas para buscar (de {len(df)} totales).\n")
@@ -133,6 +133,13 @@ def process(file_or_df, name_override=None, max_retries=3):
                 attempt = 0
                 while attempt < max_retries:
                     try:
+                        key = (artist, title)
+                        
+                        if key in written_rows[source_file]:
+                            break  # Ya se escribió, evitar duplicado. Salir del while
+                        
+                        written_rows[source_file].add(key)
+                        
                         info = ydl.extract_info(query, download=False)
                         if 'entries' in info:
                             video = choose_best_video(info['entries'], duration)
@@ -173,15 +180,6 @@ def process(file_or_df, name_override=None, max_retries=3):
         for f, _ in open_writers.values():
             f.close()
 
-    df_new = pd.DataFrame(results)
-
-    if os.path.exists(output_csv):
-        df_done = pd.read_csv(output_csv)
-        df_combined = pd.concat([df_done, df_new], ignore_index=True).drop_duplicates(subset=['Artist', 'Title'])
-        df_combined.to_csv(output_csv, index=False)  # 🔁 Sobrescribe limpio
-    else:
-        df_new.to_csv(output_csv, index=False)
-        
     logger.info(f"\n✅ Resultados actualizados en: {output_csv}")
 
 def get_cached_pairs():
