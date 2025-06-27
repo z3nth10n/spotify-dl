@@ -8,10 +8,16 @@ from yt_dlp import YoutubeDL
 from tqdm import tqdm
 from time import sleep, time
 from threading import Thread
+import re
 
 from config import USE_TORSOCKS, TOR_PROXY, DOWNLOADS_DIR, EXPORT_RESULT_DIR, FFMPEG_PATH, LOGS_DIR, renew_tor_ip
 
 CONCURRENCY = 5  # máximo de descargas simultáneas
+
+def pascal_to_title_case(text):
+    # Inserta espacio antes de cada mayúscula (excepto al inicio), luego capitaliza cada palabra
+    spaced = re.sub(r'(?<!^)(?=[A-Z])', ' ', text)
+    return spaced.title()
 
 # Función para obtener la duración real de un archivo
 def get_audio_duration(path):
@@ -141,7 +147,9 @@ def main():
         df = pd.read_csv(os.path.join(EXPORT_RESULT_DIR, file))
         df_valid = df[df['YouTube Link'].notna() & (df['YouTube Link'] != 'NOT FOUND')]
 
-        outdir = os.path.join(DOWNLOADS_DIR, os.path.splitext(file)[0])
+        filename = os.path.splitext(file)[0]
+        filename = pascal_to_title_case(filename)
+        outdir = os.path.join(DOWNLOADS_DIR, filename)
         os.makedirs(outdir, exist_ok=True)
 
         for _, row in df_valid.iterrows():
