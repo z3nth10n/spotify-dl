@@ -140,12 +140,10 @@ def process(file_or_df, name_override=None, max_retries=3):
                 attempt = 0
                 while attempt < max_retries:
                     try:
-                        key = (artist, title)
-                        
-                        if key in written_rows[source_file]:
+                        if query in written_rows[source_file]:
                             break  # Ya se escribió, evitar duplicado. Salir del while
                         
-                        written_rows[source_file].add(key)
+                        written_rows[source_file].add(query)
                         
                         info = ydl.extract_info(query, download=False)
                         if 'entries' in info:
