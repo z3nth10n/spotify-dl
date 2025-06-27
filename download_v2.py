@@ -9,10 +9,34 @@ from tqdm import tqdm
 from time import sleep, time
 from threading import Thread
 import re
+import logging
+from logging import Logger
+from collections import defaultdict
 
 from config import USE_TORSOCKS, TOR_PROXY, DOWNLOADS_DIR, EXPORT_RESULT_DIR, FFMPEG_PATH, LOGS_DIR, renew_tor_ip
 
 CONCURRENCY = 5  # máximo de descargas simultáneas
+
+loggers = defaultdict(Logger)
+
+# @todo: add logging to tqdm
+# def setup_logger(out_name):
+#     log_path = os.path.join(LOGS_DIR, f"{out_name}.log")
+    
+#     logger = logging.getLogger(log_path)
+#     logger.setLevel(logging.INFO)
+
+#     if not logger.handlers:
+#         # Archivo
+#         file_handler = logging.FileHandler(log_path, encoding='utf-8')
+#         file_handler.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s'))
+
+#         # Consola
+#         console_handler = logging.StreamHandler()
+#         console_handler.setFormatter(logging.Formatter('%(message)s'))
+
+#         logger.addHandler(file_handler)
+#         logger.addHandler(console_handler)
 
 def pascal_to_title_case(text):
     # Inserta espacio antes de cada mayúscula (excepto al inicio), luego capitaliza cada palabra
@@ -151,6 +175,9 @@ def main():
         filename = pascal_to_title_case(filename)
         outdir = os.path.join(DOWNLOADS_DIR, filename)
         os.makedirs(outdir, exist_ok=True)
+        
+        logger = setup_logger(filename)
+        # loggers[filename].add(logger)
 
         for _, row in df_valid.iterrows():
             artist = row['Artist']
