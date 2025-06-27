@@ -99,6 +99,8 @@ def process_csv(file_name, max_retries=3):
             video_title = row.get('Video Title', '')
             expected_duration = row.get('Duration (s)', None)
             url = row['YouTube Link']
+            
+            query = f"{artist} - {title}"
 
             if isinstance(video_title, str) and video_title.strip():
                 filename = os.path.join(download_path, f"{video_title}.mp3")
@@ -134,14 +136,14 @@ def process_csv(file_name, max_retries=3):
                 except Exception as e:
                     attempt += 1
                     msg = str(e).lower()
-                    print(f"❌ Error intento {attempt}: {e}")
-                    if "429" in msg or "rate limit" in msg:
+                    if "429" in msg or "rate limit" in msg and USE_TORSOCKS:
+                        print(f"❌ Error intento {attempt}: {e} - {query}")
                         print("🔁 Rate limited, cambiando IP con Tor...")
                         renew_tor_ip()
                         time.sleep(5)
                         ydl.download([url])  # intento 2
                     else:
-                        print(f"❌ Error al descargar {url}: {e}")
+                        print(f"❌ Error al descargar {url}: {e} - {query}")
 
     print(f"\n✅ Finalizado: {file_name} — {datetime.now()}\n")
 

@@ -10,7 +10,7 @@ import sys
 
 import traceback
 
-from config import EXPORT_DIR, EXPORT_RESULT_DIR, DEBUG_MODE, renew_tor_ip, ydl_opts
+from config import EXPORT_DIR, EXPORT_RESULT_DIR, USE_TORSOCKS, renew_tor_ip, ydl_opts
 
 # --- Configuración de carpetas ---
 os.makedirs(EXPORT_RESULT_DIR, exist_ok=True)
@@ -110,8 +110,8 @@ def process_file_sequential(file_or_df, name_override=None, max_retries=3):
                     # traceback.print_exc() 
                     # sys.exit(1)
                     msg = str(e).lower()
-                    print(f"❌ Error intento {attempt}: {e}")
-                    if "429" in msg or "rate limit" in msg:
+                    print(f"❌ Error intento {attempt}: {e} - {query}")
+                    if "429" in msg or "rate limit" in msg and USE_TORSOCKS:
                         print("🔁 Rate limited, cambiando IP con Tor...")
                         renew_tor_ip()
                         time.sleep(5)

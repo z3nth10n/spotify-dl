@@ -64,6 +64,7 @@ def download_worker(q, progress_q, idx, max_retries=3):
             break
 
         artist, title, url, video_title, expected_duration, outdir = task
+        query = f"{artist} - {title}"
         filename = f"{video_title}.mp3"
         filepath = os.path.join(outdir, filename)
 
@@ -86,8 +87,8 @@ def download_worker(q, progress_q, idx, max_retries=3):
             except Exception as e:
                 attempt += 1
                 msg = str(e).lower()
-                print(f"❌ Error intento {attempt}: {e}")
-                if "429" in msg or "rate limit" in msg:
+                print(f"❌ Error intento {attempt}: {e} - {query}")
+                if "429" in msg or "rate limit" in msg and USE_TORSOCKS:
                     print("🔁 Rate limited, cambiando IP con Tor...")
                     renew_tor_ip()
                     time.sleep(5)
