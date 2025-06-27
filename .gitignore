@@ -9,3 +9,4 @@ venv/
 myenv/
 __pycache__/
 logs/
+cookies.txt
