@@ -8,11 +8,18 @@ from tqdm import tqdm
 import time
 import logging
 
+import csv
+from collections import defaultdict
+
 from config import LOGS_DIR, EXPORT_DIR, EXPORT_RESULT_DIR, USE_TORSOCKS, renew_tor_ip, ydl_opts
 
 # import sys
 # import traceback
 # from datetime import datetime
+
+
+# Mapeo de source_file -> (file_handle, csv_writer)
+open_writers = {}
 
 def setup_logger(out_name):
     log_path = os.path.join(LOGS_DIR, f"{out_name}.log")
@@ -69,13 +76,17 @@ def choose_best_video(results, expected_duration=None):
 def process(file_or_df, name_override=None, max_retries=3):
     df = pd.DataFrame()
     out_name = ""
+    is_combined = False
+    source_file = ""
     
     if isinstance(file_or_df, str):
         df = pd.read_csv(file_or_df)
         out_name = os.path.splitext(os.path.basename(file_or_df))[0]
+        source_file = out_name
     else:
         df = file_or_df
         out_name = name_override or "combined"
+        is_combined = True
         
     logger = setup_logger(out_name)
     
@@ -96,72 +107,76 @@ def process(file_or_df, name_override=None, max_retries=3):
 
     logger.info(f"🔍 Encontradas {len(to_process)} canciones nuevas para buscar (de {len(df)} totales).\n")
     logger.info(f"🔍 Buscando {len(to_process)} canciones una por una...\n")
-    
-    # print(ydl_opts)
 
-    with YoutubeDL(ydl_opts) as ydl:
-        for _, row in tqdm(to_process.iterrows(), total=len(to_process)):
-            artist = row['Artist']
-            title = row['Track Name']
-            query = f"{artist} - {title}"
-            duration = row['Expected Duration (s)']
-
-            attempt = 0
-            while attempt < max_retries:
-                try:
-                    info = ydl.extract_info(query, download=False)
-                    if 'entries' in info:
-                        video = choose_best_video(info['entries'], duration)
-                    else:
-                        video = info
-
-                    results.append({
-                        'Artist': artist,
-                        'Title': title,
-                        'YouTube Link': f"https://www.youtube.com/watch?v={video['id']}",
-                        'Video Title': video.get('title', ''),
-                        'Uploader': video.get('uploader', ''),
-                        'Duration (s)': video.get('duration', '')
-                    })
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            for _, row in tqdm(to_process.iterrows(), total=len(to_process)):
+                artist = row['Artist']
+                title = row['Track Name']
+                query = f"{artist} - {title}"
+                duration = row['Expected Duration (s)']
+                
+                if is_combined:
+                    source_file = row['Source File']
                     
-                    # 🟡 Guardar fila inmediatamente
-                    pd.DataFrame([results[-1]]).to_csv(
-                        output_csv,
-                        mode='a',
-                        header=not os.path.exists(output_csv),
-                        index=False
-                    )
-                    break
-                except Exception as e:
-                    # print(e)
-                    # traceback.print_exc() 
-                    # sys.exit(1)
-                    
-                    msg = str(e).lower()
-                    logger.error(f"❌ Error intento {attempt}: {e} - {query}")
-                    if "429" in msg or "rate limit" in msg and USE_TORSOCKS:
-                        logger.warning("🔁 Rate limited, cambiando IP con Tor...")
-                        renew_tor_ip()
-                        time.sleep(5)
-                        attempt += 1
-                    else:
-                        results.append({
+                output_path = os.path.join(EXPORT_RESULT_DIR, f"{source_file}.csv")
+                
+                # Abrir escritor si no existe
+                if source_file not in open_writers:
+                    f = open(output_path, mode='w', newline='', encoding='utf-8')
+                    writer = csv.writer(f)
+                    # Escribir cabecera solo si el archivo está vacío
+                    if os.stat(output_path).st_size == 0:
+                        writer.writerow(['Artist', 'Title', 'YouTube Link', 'Video Title', 'Uploader', 'Duration (s)'])
+                    open_writers[source_file] = (f, writer)
+
+                attempt = 0
+                while attempt < max_retries:
+                    try:
+                        info = ydl.extract_info(query, download=False)
+                        if 'entries' in info:
+                            video = choose_best_video(info['entries'], duration)
+                        else:
+                            video = info
+                            
+                        video_link = f"https://www.youtube.com/watch?v={video['id']}"
+
+                        open_writers[source_file][1].writerow({
                             'Artist': artist,
                             'Title': title,
-                            'YouTube Link': 'NOT FOUND',
-                            'Video Title': '',
-                            'Uploader': '',
-                            'Duration (s)': ''
+                            'YouTube Link': video_link,
+                            'Video Title': video.get('title', ''),
+                            'Uploader': video.get('uploader', ''),
+                            'Duration (s)': video.get('duration', '')
                         })
-                        
-                        pd.DataFrame([results[-1]]).to_csv(
-                            output_csv,
-                            mode='a',
-                            header=not os.path.exists(output_csv),
-                            index=False
-                        )
-                        
                         break
+                    except Exception as e:
+                        # print(e)
+                        # traceback.print_exc() 
+                        # sys.exit(1)
+                        
+                        msg = str(e).lower()
+                        logger.error(f"❌ Error intento {attempt}: {e} - {query}")
+                        if "429" in msg or "rate limit" in msg and USE_TORSOCKS:
+                            logger.warning("🔁 Rate limited, cambiando IP con Tor...")
+                            renew_tor_ip()
+                            time.sleep(5)
+                            attempt += 1
+                        else:
+                            open_writers[source_file][1].writerow({
+                                'Artist': artist,
+                                'Title': title,
+                                'YouTube Link': 'NOT FOUND',
+                                'Video Title': '',
+                                'Uploader': '',
+                                'Duration (s)': ''
+                            })
+                            break
+                        break
+    finally:
+        # ✅ Cerrar todos los ficheros
+        for f, _ in open_writers.values():
+            f.close()
 
     df_new = pd.DataFrame(results)
 
@@ -199,6 +214,7 @@ def concatenate_all_exports():
         if not file.endswith('.csv'):
             continue
         df = pd.read_csv(os.path.join(EXPORT_DIR, file))
+        df["Source File"] = os.path.splitext(file)[0]
         df = df[['Artist Name(s)', 'Track Name', 'Duration (ms)']].drop_duplicates()
         df['Artist'] = df['Artist Name(s)'].apply(lambda x: str(x).split(',')[0].strip() if pd.notna(x) else 'Unknown')
         df['Expected Duration (s)'] = df['Duration (ms)'] / 1000
