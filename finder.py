@@ -120,6 +120,9 @@ def process(file_or_df, name_override=None, max_retries=3):
                 artist = row['Artist']
                 title = row['Track Name']
                 query = f"{artist} - {title}"
+                
+                # ensure if we don't combine all the logs that at least, we have duration set
+                row['Expected Duration (s)'] = row['Duration (ms)'] / 1000
                 duration = row['Expected Duration (s)']
                 
                 if is_combined:
